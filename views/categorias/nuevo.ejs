@@ -1,0 +1,38 @@
+<!-- views/categorias/nuevo.ejs -->
+
+<div class="container py-4">
+  <h2 class="mb-4 text-center">Registrar Nueva Categoría</h2>
+
+  <!-- Mensaje de éxito -->
+  <% if (mensaje) { %>
+    <div class="alert alert-success text-center">
+      <%= mensaje %>
+    </div>
+  <% } %>
+
+  <!-- Mensaje de error -->
+  <% if (error) { %>
+    <div class="alert alert-danger text-center">
+      <%= error %>
+    </div>
+  <% } %>
+
+  <!-- Formulario de registro -->
+  <form action="/categorias" method="POST">
+    <div class="mb-3">
+      <label for="nombre" class="form-label">Nombre de la Categoría</label>
+      <input 
+        type="text" 
+        class="form-control" 
+        id="nombre" 
+        name="nombre" 
+        required 
+        placeholder="Ej: Bebidas"
+        value="<%= typeof nombre !== 'undefined' ? nombre : '' %>" <!-- Mantener valor si hubo error -->
+      >
+    </div>
+
+    <button type="submit" class="btn btn-primary">Guardar</button>
+    <a href="/categorias" class="btn btn-secondary">Cancelar</a>
+  </form>
+</div>

@@ -1,0 +1,53 @@
+<!-- views/categorias/index.ejs -->
+<div class="container mt-4">
+  <div class="row mb-4">
+    <div class="col">
+      <h1>Categorías</h1>
+      <a href="/categorias/nuevo" class="btn btn-success mt-2">Agregar Nueva Categoría</a>
+    </div>
+  </div>
+
+  <!-- Mensajes -->
+  <% if (mensaje) { %>
+    <div class="alert alert-success"><%= mensaje %></div>
+  <% } %>
+  <% if (error) { %>
+    <div class="alert alert-danger"><%= error %></div>
+  <% } %>
+
+  <!-- Tabla de categorías -->
+  <div class="row">
+    <div class="col-12">
+      <% if (categorias.length > 0) { %>
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% categorias.forEach(function(categoria) { %>
+              <tr>
+                <td><%= categoria.id %></td>
+                <td><%= categoria.nombre %></td>
+                <td>
+                  <!-- Editar -->
+                  <a href="/categorias/<%= categoria.id %>/editar" class="btn btn-sm btn-warning">Editar</a>
+
+                  <!-- Eliminar -->
+                  <form action="/categorias/<%= categoria.id %>?_method=DELETE" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar categoría?')">Eliminar</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } else { %>
+        <div class="alert alert-info">No hay categorías disponibles</div>
+      <% } %>
+    </div>
+  </div>
+</div>

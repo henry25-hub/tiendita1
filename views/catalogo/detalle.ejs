@@ -1,0 +1,36 @@
+<div class="container py-4">
+  <h2 class="mb-4"><%= producto.nombre %></h2>
+  <div class="row">
+    <!-- Carousel de imágenes -->
+    <div class="col-md-6">
+      <% if (imagenes && imagenes.length > 0) { %>
+        <div id="carouselProducto" class="carousel slide" data-bs-ride="carousel">
+          <div class="carousel-inner">
+            <% imagenes.forEach((img, i) => { %>
+              <div class="carousel-item <%= i === 0 ? 'active' : '' %>">
+                <img src="<%= img.url %>" class="d-block w-100" alt="Imagen <%= i+1 %>">
+              </div>
+            <% }) %>
+          </div>
+          <button class="carousel-control-prev" type="button" data-bs-target="#carouselProducto" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon"></span>
+          </button>
+          <button class="carousel-control-next" type="button" data-bs-target="#carouselProducto" data-bs-slide="next">
+            <span class="carousel-control-next-icon"></span>
+          </button>
+        </div>
+      <% } else { %>
+        <p>No hay imágenes para este producto.</p>
+      <% } %>
+    </div>
+
+    <!-- Información del producto -->
+    <div class="col-md-6">
+      <h4>Precio: S/. <%= producto.precio %></h4>
+      <p>Categoría: <%= producto.categoria %></p>
+      <!-- Puedes agregar más info aquí -->
+    </div>
+  </div>
+
+  <a href="/catalogo" class="btn btn-secondary mt-4">Volver al catálogo</a>
+</div>

@@ -1,0 +1,54 @@
+<!-- views/productos/editarp.ejs -->
+
+<div class="container py-4">
+  <h2 class="mb-4 text-center">Editar Producto</h2>
+
+  <!-- Mensajes -->
+  <% if (mensaje) { %>
+    <div class="alert alert-success text-center"><%= mensaje %></div>
+  <% } %>
+  <% if (error) { %>
+    <div class="alert alert-danger text-center"><%= error %></div>
+  <% } %>
+
+  <form action="/productos/editarp/<%= producto.id %>" method="POST">
+    <div class="mb-3">
+      <label class="form-label" for="nombre">Nombre:</label>
+      <input 
+        type="text" 
+        name="nombre" 
+        id="nombre" 
+        class="form-control" 
+        value="<%= producto.nombre %>" 
+        required
+      >
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label" for="precio">Precio (S/):</label>
+      <input 
+        type="number" 
+        name="precio" 
+        id="precio" 
+        class="form-control" 
+        value="<%= producto.precio %>" 
+        required 
+        step="0.01"
+      >
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label" for="categoria_id">Categoría:</label>
+      <select name="categoria_id" id="categoria_id" class="form-select" required>
+        <% categorias.forEach(c => { %>
+          <option value="<%= c.id %>" <%= producto.categoria_id == c.id ? 'selected' : '' %>>
+            <%= c.nombre %>
+          </option>
+        <% }) %>
+      </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Actualizar Producto</button>
+    <a href="/productos" class="btn btn-secondary">Cancelar</a>
+  </form>
+</div>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/vendor/bootstrap/css/bootstrap.min.css">
+</head>
+<body>
+  <div class="container mt-5">
+    <h1 class="mb-4"><%= title %></h1>
+
+    <!-- Filtro por categoría -->
+    <form method="GET" action="/catalogo" class="mb-4">
+      <select name="categoria" class="form-select" onchange="this.form.submit()">
+        <option value="">Todas las categorías</option>
+        <% categorias.forEach(c => { %>
+          <option value="<%= c.id %>" <%= c.id == categoriaId ? "selected" : "" %>><%= c.nombre %></option>
+        <% }) %>
+      </select>
+    </form>
+
+    <div class="row">
+      <% if (productos.length > 0) { %>
+        <% productos.forEach(p => { %>
+          <div class="col-md-4 mb-4">
+            <div class="card h-100">
+              <% if (p.imagen) { %>
+                <img src="<%= p.imagen %>" class="card-img-top" alt="<%= p.nombre %>">
+              <% } else { %>
+                <img src="/imagenes/default.png" class="card-img-top" alt="Sin imagen">
+              <% } %>
+              <div class="card-body">
+                <h5 class="card-title"><%= p.nombre %></h5>
+                <p class="card-text">Categoría: <%= p.categoria %></p>
+                <p class="card-text">Precio: S/ <%= p.precio %></p>
+                <a href="/catalogo/<%= p.id %>" class="btn btn-primary">Ver detalle</a>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <p>No hay productos disponibles en esta categoría.</p>
+      <% } %>
+    </div>
+  </div>
+</body>
+</html>

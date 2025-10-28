@@ -1,0 +1,37 @@
+<!-- views/productos/nuevop.ejs -->
+<div class="container py-4">
+  <h2 class="mb-4 text-center">Registrar Nuevo Producto</h2>
+
+  <% if (mensaje) { %>
+    <div class="alert alert-success"><%= mensaje %></div>
+  <% } %>
+
+  <% if (error) { %>
+    <div class="alert alert-danger"><%= error %></div>
+  <% } %>
+
+  <form action="/productos" method="POST" class="mb-5">
+    <div class="mb-3">
+      <label for="nombre" class="form-label">Nombre del Producto</label>
+      <input type="text" class="form-control" id="nombre" name="nombre" required placeholder="Ej: Jugo de Naranja">
+    </div>
+
+    <div class="mb-3">
+      <label for="precio" class="form-label">Precio</label>
+      <input type="number" class="form-control" id="precio" name="precio" required step="0.01" placeholder="Ej: 5.50">
+    </div>
+
+    <div class="mb-3">
+      <label for="categoria_id" class="form-label">Categoría</label>
+      <select class="form-select" id="categoria_id" name="categoria_id" required>
+        <option value="">Seleccione una categoría</option>
+        <% categorias.forEach(cat => { %>
+          <option value="<%= cat.id %>"><%= cat.nombre %></option>
+        <% }) %>
+      </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Guardar Producto</button>
+    <a href="/productos" class="btn btn-secondary">Cancelar</a>
+  </form>
+</div>

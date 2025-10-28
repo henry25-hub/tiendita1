@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title || "Cake Sweet" %></title>
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+</head>
+<body class="bg-light">
+
+  <!-- Navbar morado -->
+  <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #6f42c1;">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/">Cake Sweet</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarContent">
+        <ul class="navbar-nav ms-auto">
+          <% if (isAuthenticated) { %>
+            <li class="nav-item">
+              <span class="nav-link">Hola, <strong><%= user.usuario %></strong></span>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/home"><i class="bi bi-speedometer2"></i> Dashboard</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/login/logout"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</a>
+            </li>
+          <% } else { %>
+            <li class="nav-item">
+              <a class="nav-link" href="/login"><i class="bi bi-box-arrow-in-right"></i> Iniciar sesión</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/register"><i class="bi bi-person-plus"></i> Registrarse</a>
+            </li>
+          <% } %>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+    <% if (mensaje) { %>
+      <div class="alert alert-purple alert-dismissible fade show" role="alert" style="background-color: #9f7aea; color: white;">
+        <i class="bi bi-info-circle"></i> <%= mensaje %>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+      </div>
+    <% } %>
+
+    <% if (error) { %>
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle"></i> <%= error %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <% } %>
+
+    <%- body %>
+  </div>
+
+  <!-- Bootstrap JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

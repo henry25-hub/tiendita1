@@ -1,0 +1,73 @@
+<!-- views/productos/indexp.ejs -->
+<div class="container mt-4">
+  <div class="row mb-4">
+    <div class="col">
+      <h1>Productos Disponibles</h1>
+      <a href="/productos/nuevop" class="btn btn-success mt-2">Agregar Nuevo Producto</a>
+    </div>
+  </div>
+
+  <!-- Mensajes -->
+  <% if (mensaje) { %>
+    <div class="alert alert-success"><%= mensaje %></div>
+  <% } %>
+  <% if (error) { %>
+    <div class="alert alert-danger"><%= error %></div>
+  <% } %>
+
+  <!-- Filtro de categorías -->
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title mb-3">Filtrar por Categoría</h5>
+          <select class="form-select" id="categoriaFilter" onchange="window.location.href=this.value">
+            <option value="/productos" <%= !categoriaId ? 'selected' : '' %>>Todas las categorías</option>
+            <% categorias.forEach(function(c) { %>
+              <option value="/productos?categoria=<%= c.id %>" <%= Number(categoriaId) === c.id ? 'selected' : '' %>><%= c.nombre %></option>
+            <% }); %>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabla de productos -->
+  <div class="row">
+    <div class="col-12">
+      <% if (productos.length > 0) { %>
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Precio (S/)</th>
+              <th>Categoría</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% productos.forEach(function(producto) { %>
+              <tr>
+                <td><%= producto.id %></td>
+                <td><%= producto.nombre %></td>
+                <td><%= Number(producto.precio).toFixed(2) %></td>
+                <td><%= producto.categoria || 'Sin categoría' %></td>
+                <td>
+                  <% if (isAuthenticated) { %>
+                    <a href="/productos/editarp/<%= producto.id %>" class="btn btn-sm btn-warning">Editar</a>
+                    <form action="/productos/<%= producto.id %>/delete" method="POST" class="d-inline">
+                      <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar producto?')">Eliminar</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } else { %>
+        <div class="alert alert-info">No hay productos disponibles</div>
+      <% } %>
+    </div>
+  </div>
+</div>
