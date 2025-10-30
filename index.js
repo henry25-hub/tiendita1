@@ -8,13 +8,14 @@ const session = require('express-session');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const expressLayouts = require('express-ejs-layouts');
+const isAuthenticated = require('./middleware/auth');
 const { query } = require('./db');
+const ipFilter = require('./middleware/ipFilter');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 const SECRET_KEY = process.env.JWT_SECRET;
 
-// ✅ Verificar variables esenciales
 if (!SECRET_KEY) {
   console.error("❌ JWT_SECRET no definido en .env");
   process.exit(1);
@@ -29,26 +30,9 @@ app.set('layout', 'layout');
 // 🗂️ Archivos estáticos
 app.use(express.static('public'));
 app.use('/vendor/bootstrap', express.static(path.join(__dirname, 'node_modules/bootstrap/dist')));
-app.use('/vendor/bootstrap-icons', express.static(path.join(__dirname, 'node_modules/bootstrap-icons/font')));
+app.use('/vendor/bootstrap-icons', express.static(path.join(__dirname, 'node_modules/bootstrap-icons')));
 
-// 🌐 Configurar CORS
-const cors = require('cors');
-const allowedOrigins = [
-  'http://localhost:5173', // local
-  'https://tiendita1.onrender.com' // frontend en producción
-];
-const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Origen no permitido por CORS'), false);
-    }
-  }
-};
-app.use(cors(corsOptions));
-
-// 🔧 Middlewares base
+// 🟦 Middleware base
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride('_method'));
@@ -59,50 +43,49 @@ app.use(session({
   saveUninitialized: true
 }));
 
-// 🔐 Middleware de autenticación JWT
-const requireAuth = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) {
-    return res.status(401).json({ error: 'Token requerido' });
+// 🔹 CORS seguro
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://pasteleria-1.onrender.com'
+];
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
   }
-  jwt.verify(token, SECRET_KEY, (err, user) => {
-    if (err) return res.status(403).json({ error: 'Token inválido' });
-    req.user = user;
-    next();
-  });
-};
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
 
-// 🔒 Filtro de IP
-const ipFilter = (req, res, next) => {
-  let clientIP = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress;
-  if (clientIP && clientIP.includes(',')) {
-    clientIP = clientIP.split(',')[0].trim();
-  }
+// 🔹 Middleware global de autenticación (JWT)
+app.use((req, res, next) => {
+  const token = req.cookies.token;
 
-  const allowedIps = [
-    '45.232.149.130', // IP del instituto
-    '181.176.231.194', // Otra IP
-    '45.232.149.146'   // Tu casa
-  ];
-
-  // Permitir todo en desarrollo
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(`[DEV] Filtro de IP desactivado.`);
-    return next();
-  }
-
-  console.log(`[PROD] Verificando IP: ${clientIP}`);
-
-  if (allowedIps.includes(clientIP)) {
-    console.log(`[PROD] ACCESO PERMITIDO para la IP: ${clientIP}`);
-    next();
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, SECRET_KEY);
+      res.locals.isAuthenticated = true;
+      res.locals.user = decoded;
+    } catch {
+      res.locals.isAuthenticated = false;
+      res.locals.user = null;
+    }
   } else {
-    console.log(`[PROD] ACCESO DENEGADO para la IP: ${clientIP}`);
-    res.status(403).json({ message: 'Acceso denegado: IP no permitida' });
+    res.locals.isAuthenticated = false;
+    res.locals.user = null;
   }
-};
 
-// 🧪 Ruta de prueba para DB
+  res.locals.isLoginPage = req.path.startsWith('/login') || req.path.startsWith('/register');
+  res.locals.title = "Cake Sweet";
+  res.locals.error = null;
+  res.locals.mensaje = null;
+  next();
+});
+
+// 🔹 Rutas de prueba
 app.get('/api/test-db', async (req, res) => {
   try {
     const result = await query('SELECT NOW()');
@@ -111,6 +94,10 @@ app.get('/api/test-db', async (req, res) => {
     console.error('Error DB:', err);
     res.status(500).json({ error: '❌ Error en la conexión a la base de datos', detalle: err.message });
   }
+});
+
+app.get('/api/test-cors', (req, res) => {
+  res.json({ status: "OK", origin: req.headers.origin, message: "CORS funcionando correctamente 🚀" });
 });
 
 // 🚀 Importar rutas
@@ -122,23 +109,24 @@ const productosRoutes = require('./routes/productos');
 const categoriasRoutes = require('./routes/categorias');
 const imagenesRoutes = require('./routes/imagenes');
 
-// 🏠 Rutas
-app.get('/', (req, res) => res.redirect('/catalogo'));
+const allowedIps = process.env.ALLOWED_IPS?.split(',') || [];
+
+// 🏠 Ruta raíz
+app.get('/', (req, res) => res.locals.isAuthenticated ? res.redirect('/home') : res.redirect('/catalogo'));
+
+// 🌍 Rutas públicas (sin restricción de IP)
 app.use('/catalogo', catalogoRoutes);
 app.use('/login', loginRoutes);
 app.use('/register', registerRoutes);
 
-// 🔒 Rutas privadas (JWT + IP)
-app.use('/home', requireAuth, ipFilter, homeRoutes);
-app.use('/productos', requireAuth, ipFilter, productosRoutes);
-app.use('/categorias', requireAuth, ipFilter, categoriasRoutes);
-app.use('/imagenes', requireAuth, ipFilter, imagenesRoutes);
+// 🔒 Rutas privadas (IP + JWT)
+app.use('/home', isAuthenticated, ipFilter(allowedIps), homeRoutes);
+app.use('/productos', isAuthenticated, ipFilter(allowedIps), productosRoutes);
+app.use('/categorias', isAuthenticated, ipFilter(allowedIps), categoriasRoutes);
+app.use('/imagenes', isAuthenticated, ipFilter(allowedIps), imagenesRoutes);
 
-// 📘 Swagger Docs
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  explorer: true,
-  swaggerOptions: { persistAuthorization: true }
-}));
+// 📘 Swagger
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true, swaggerOptions: { persistAuthorization: true }}));
 
 // ❌ Error 404
 app.use((req, res) => {
@@ -153,8 +141,8 @@ app.use((err, req, res, next) => {
   console.error('Error no controlado:', err);
   const isJson = req.headers.accept?.includes('application/json');
   return isJson
-    ? res.status(500).json({ mensaje: 'Error interno del servidor' })
-    : res.status(500).render('error', { title: "Error 500", mensaje: 'Ocurrió un error interno', error: null });
+    ? res.status(500).json({ mensaje: 'Error interno del servidor', error: 'Ocurrió un error. Intente nuevamente.' })
+    : res.status(500).render('error', { title: "Error del servidor", mensaje: 'Ocurrió un error. Intente nuevamente.', error: null });
 });
 
 // 🚀 Iniciar servidor
