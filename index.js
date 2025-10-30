@@ -10,7 +10,6 @@ const cookieParser = require('cookie-parser');
 const expressLayouts = require('express-ejs-layouts');
 const isAuthenticated = require('./middleware/auth');
 const { query } = require('./db');
-const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -30,26 +29,27 @@ app.set('layout', 'layout');
 // 🗂️ Archivos estáticos
 app.use(express.static('public'));
 app.use('/vendor/bootstrap', express.static(path.join(__dirname, 'node_modules/bootstrap/dist')));
-app.use('/vendor/bootstrap-icons', express.static(path.join(__dirname, 'node_modules/bootstrap-icons')));
+app.use('/vendor/bootstrap-icons', express.static(path.join(__dirname, 'node_modules/bootstrap-icons/dist')));
 
-// 🌐 CORS
+// --- NUEVO: AÑADIR CORS ---
+const cors = require('cors');
 const allowedOrigins = [
-  'http://localhost:5173',
-  'https://tiendita1.onrender.com'
+  'http://localhost:5173', // Para desarrollo local
+  'https://tiendita1.onrender.com' // Para tu frontend desplegado
 ];
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS no permitido para esta URL'));
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
-  },
-  credentials: true
+    const message = 'The CORS policy for this site does not allow access from the specified Origin.';
+    return callback(new Error(message), false);
+  }
 };
 app.use(cors(corsOptions));
 
-// 🟦 Middlewares base
+// 🟦 Middleware base
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride('_method'));
@@ -60,38 +60,50 @@ app.use(session({
   saveUninitialized: true
 }));
 
-// 🔐 Middleware JWT
+// --- NUEVO: AÑADIR MIDDLEWARE DE AUTENTICACIÓN (JWT) ---
 const requireAuth = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Token requerido' });
+  if (!token) {
+    return res.status(401).json({ error: 'Token requerido' });
+  }
   jwt.verify(token, SECRET_KEY, (err, user) => {
-    if (err) return res.status(403).json({ error: 'Token inválido' });
+    if (err) {
+      return res.status(403).json({ error: 'Token inválido' });
+    }
     req.user = user;
     next();
   });
 };
 
-// 🔒 Filtro de IP
-const ipChecker = (req, res, next) => {
+// --- NUEVO: AÑADIR MIDDLEWARE DE FILTRO DE IP ---
+const ipFilter = (req, res, next) => {
   let clientIP = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress;
-  if (clientIP && clientIP.includes(',')) clientIP = clientIP.split(',')[0].trim();
+  if (clientIP && clientIP.includes(',')) {
+    clientIP = clientIP.split(',')[0].trim();
+  }
 
   const allowedIps = [
     '45.232.149.130',
     '181.176.231.194',
-    '45.232.149.146',
-    '127.0.0.1',
-    '::1'
+    '45.232.149.146'
   ];
 
-  console.log(`[IP CHECK] Intento desde ${clientIP}`);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[DEV] Modo Desarrollo. Filtro de IP desactivado.`);
+    return next();
+  }
 
-  if (process.env.NODE_ENV !== 'production') return next();
-  if (allowedIps.includes(clientIP)) next();
-  else res.status(403).json({ message: 'Acceso denegado: IP no permitida' });
+  console.log(`[PROD] Verificando IP: ${clientIP}`);
+  if (allowedIps.includes(clientIP)) {
+    console.log(`[PROD] ACCESO PERMITIDO para la IP: ${clientIP}`);
+    next();
+  } else {
+    console.log(`[PROD] ACCESO DENEGADO para la IP: ${clientIP}`);
+    res.status(403).json({ message: 'Acceso denegado: IP no permitida' });
+  }
 };
 
-// 🧪 Test DB
+// --- Rutas de prueba ---
 app.get('/api/test-db', async (req, res) => {
   try {
     const result = await query('SELECT NOW()');
@@ -102,7 +114,7 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
-// 📦 Importar rutas
+// 🚀 Importar rutas
 const catalogoRoutes = require('./routes/catalogo');
 const loginRoutes = require('./routes/login');
 const registerRoutes = require('./routes/register');
@@ -111,29 +123,44 @@ const productosRoutes = require('./routes/productos');
 const categoriasRoutes = require('./routes/categorias');
 const imagenesRoutes = require('./routes/imagenes');
 
-// 🏠 Rutas
+// 🏠 Ruta raíz
 app.get('/', (req, res) => res.locals.isAuthenticated ? res.redirect('/home') : res.redirect('/catalogo'));
+
+// 🌍 Rutas públicas (sin restricción de IP)
 app.use('/catalogo', catalogoRoutes);
 app.use('/login', loginRoutes);
 app.use('/register', registerRoutes);
-app.use('/home', requireAuth, ipChecker, homeRoutes);
-app.use('/productos', requireAuth, ipChecker, productosRoutes);
-app.use('/categorias', requireAuth, ipChecker, categoriasRoutes);
-app.use('/imagenes', requireAuth, ipChecker, imagenesRoutes);
+
+// 🔒 Rutas privadas (PROTEGIDAS POR JWT + FILTRO DE IP)
+app.use('/home', requireAuth, ipFilter, homeRoutes);
+app.use('/productos', requireAuth, ipFilter, productosRoutes);
+app.use('/categorias', requireAuth, ipFilter, categoriasRoutes);
+app.use('/imagenes', requireAuth, ipFilter, imagenesRoutes);
 
 // 📘 Swagger
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true, swaggerOptions: { persistAuthorization: true } }));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  explorer: true,
+  swaggerOptions: { persistAuthorization: true }
+}));
 
-// ❌ 404
-app.use((req, res) => res.status(404).json({ mensaje: 'Ruta no encontrada' }));
-
-// 🔥 500
-app.use((err, req, res, next) => {
-  console.error('Error no controlado:', err);
-  res.status(500).json({ mensaje: 'Error interno del servidor' });
+// ❌ Error 404
+app.use((req, res) => {
+  const isJson = req.headers.accept?.includes('application/json');
+  return isJson
+    ? res.status(404).json({ mensaje: 'Ruta no encontrada' })
+    : res.status(404).render('error', { title: "Error 404", mensaje: 'Página no encontrada', error: null });
 });
 
-// 🚀 Servidor
+// 🔥 Error 500
+app.use((err, req, res, next) => {
+  console.error('Error no controlado:', err);
+  const isJson = req.headers.accept?.includes('application/json');
+  return isJson
+    ? res.status(500).json({ mensaje: 'Error interno del servidor', error: 'Ocurrió un error. Intente nuevamente.' })
+    : res.status(500).render('error', { title: "Error del servidor", mensaje: 'Ocurrió un error. Intente nuevamente.', error: null });
+});
+
+// 🚀 Iniciar servidor
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Servidor corriendo en puerto ${PORT}`);
   console.log(`📘 Swagger Docs disponibles en /api-docs`);
