@@ -11,7 +11,6 @@ const expressLayouts = require('express-ejs-layouts');
 const isAuthenticated = require('./middleware/auth');
 const { query } = require('./db');
 const ipFilter = require('./middleware/ipFilter');
-const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -44,45 +43,21 @@ app.use(session({
   saveUninitialized: true
 }));
 
-// 🌍 CORS (Render + Netlify + localhost)
+// 🔹 CORS seguro
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://pasteleria-1.onrender.com',
-  'https://admirable-fudge-d69549.netlify.app' // ✅ tu frontend Netlify
+  'https://pasteleria-1.onrender.com'
 ];
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS bloqueado para esta URL'));
-    }
-  },
-  credentials: true
-}));
-
-// 🔒 Bloqueo de IPs externas
 app.use((req, res, next) => {
-  let clientIP = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress;
-
-  // Si viene en formato "ip, ip", toma solo la primera
-  if (clientIP && clientIP.includes(',')) {
-    clientIP = clientIP.split(',')[0].trim();
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
   }
-
-  // Lista de IPs válidas (tu red local o IP pública)
-  const allowedIPs = [
-    '45.232.149.146', // ✅ tu IP
-    '127.0.0.1',      // localhost
-    '::1'             // IPv6 localhost
-  ];
-
-  if (allowedIPs.includes(clientIP)) {
-    next();
-  } else {
-    console.warn(`🚫 IP no permitida: ${clientIP}`);
-    res.status(403).json({ message: 'Acceso denegado: IP no permitida' });
-  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
 });
 
 // 🔹 Middleware global de autenticación (JWT)
@@ -139,12 +114,12 @@ const allowedIps = process.env.ALLOWED_IPS?.split(',') || [];
 // 🏠 Ruta raíz
 app.get('/', (req, res) => res.locals.isAuthenticated ? res.redirect('/home') : res.redirect('/catalogo'));
 
-// 🌍 Rutas públicas
+// 🌍 Rutas públicas (sin restricción de IP)
 app.use('/catalogo', catalogoRoutes);
 app.use('/login', loginRoutes);
 app.use('/register', registerRoutes);
 
-// 🔒 Rutas privadas
+// 🔒 Rutas privadas (IP + JWT)
 app.use('/home', isAuthenticated, ipFilter(allowedIps), homeRoutes);
 app.use('/productos', isAuthenticated, ipFilter(allowedIps), productosRoutes);
 app.use('/categorias', isAuthenticated, ipFilter(allowedIps), categoriasRoutes);
@@ -178,4 +153,3 @@ app.listen(PORT, "0.0.0.0", () => {
 });
 
 module.exports = app;
-
