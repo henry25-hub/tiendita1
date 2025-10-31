@@ -1,8 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const cors = require('cors');
-const requestIp = require('request-ip');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const methodOverride = require('method-override');
@@ -12,19 +10,19 @@ const cookieParser = require('cookie-parser');
 const expressLayouts = require('express-ejs-layouts');
 const isAuthenticated = require('./middleware/auth');
 const { query } = require('./db');
-const ipFilter = require('./middleware/ipFilter');
+const requestIp = require('request-ip');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 const SECRET_KEY = process.env.JWT_SECRET;
 
-// 🧩 Verificar variable JWT
+// 🔐 Verifica claves importantes
 if (!SECRET_KEY) {
   console.error("❌ JWT_SECRET no definido en .env");
   process.exit(1);
 }
 
-// ⚙️ Configurar vistas y layouts EJS
+// 🧩 Configuración EJS + layouts
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(expressLayouts);
@@ -35,7 +33,7 @@ app.use(express.static('public'));
 app.use('/vendor/bootstrap', express.static(path.join(__dirname, 'node_modules/bootstrap/dist')));
 app.use('/vendor/bootstrap-icons', express.static(path.join(__dirname, 'node_modules/bootstrap-icons')));
 
-// 🟦 Middlewares base
+// 🟦 Middleware base
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride('_method'));
@@ -46,26 +44,23 @@ app.use(session({
   saveUninitialized: true
 }));
 
-// 🧭 Detectar IP real (Render + local)
+// 🧠 Detectar IP del cliente
 app.use(requestIp.mw());
 
-// ✅ Lista de IPs permitidas (puedes agregar más)
-const allowedIPs = [
+// ✅ Lista de IPs permitidas (puedes poner más separadas por coma en .env)
+const allowedIPs = process.env.ALLOWED_IPS?.split(',') || [
   '45.232.149.130', // IP pública del Instituto
-  '45.232.149.146', // otra IP del Instituto (por si acaso)
-  '127.0.0.1',      // localhost
-  '::1'             // localhost IPv6
+  '::1',            // localhost
+  '127.0.0.1'
 ];
 
-// 🔐 Middleware de control de acceso por IP
+// 🔒 Middleware de control de acceso por IP
 app.use((req, res, next) => {
-  const forwarded = req.headers['x-forwarded-for'];
-  let clientIP = forwarded ? forwarded.split(',')[0].trim() : req.clientIp;
-  clientIP = clientIP?.replace('::ffff:', '') || 'desconocida';
-
-  console.log(`🕵️ Intento de acceso desde: ${clientIP}`);
+  const clientIP = req.clientIp?.replace('::ffff:', '') || 'desconocida';
+  console.log(`🕵️ Acceso desde: ${clientIP}`);
 
   const isAllowed = allowedIPs.some(ip => clientIP.includes(ip));
+
   if (!isAllowed) {
     return res.status(403).send(`
       <html>
@@ -74,7 +69,7 @@ app.use((req, res, next) => {
           <style>
             body {
               font-family: Arial, sans-serif;
-              background-color: #f5f5f5;
+              background-color: #f9f9f9;
               color: #333;
               text-align: center;
               padding-top: 10%;
@@ -85,7 +80,7 @@ app.use((req, res, next) => {
         <body>
           <h1>❌ Acceso denegado</h1>
           <p>Este servicio solo está disponible desde la red del <b>Instituto Continental</b>.</p>
-          <p>Tu IP detectada: <b>${clientIP}</b></p>
+          <p>Tu IP detectada: ${clientIP}</p>
         </body>
       </html>
     `);
@@ -94,25 +89,28 @@ app.use((req, res, next) => {
   next();
 });
 
-// ⚙️ CORS seguro
+// 🌐 CORS seguro
 const allowedOrigins = [
-  'https://pasteleria-1.onrender.com', // dominio Render
-  'http://localhost:5173'              // entorno local
+  'http://localhost:5173',
+  'https://pasteleria-1.onrender.com'
 ];
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS no permitido'));
-    }
-  },
-  credentials: true
-}));
 
-// 🔹 Middleware JWT global
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
+// 🪪 Middleware global de autenticación (JWT)
 app.use((req, res, next) => {
   const token = req.cookies.token;
+
   if (token) {
     try {
       const decoded = jwt.verify(token, SECRET_KEY);
@@ -126,8 +124,11 @@ app.use((req, res, next) => {
     res.locals.isAuthenticated = false;
     res.locals.user = null;
   }
+
   res.locals.isLoginPage = req.path.startsWith('/login') || req.path.startsWith('/register');
   res.locals.title = "Cake Sweet";
+  res.locals.error = null;
+  res.locals.mensaje = null;
   next();
 });
 
@@ -142,7 +143,11 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
-// 🔹 Rutas importadas
+app.get('/api/test-cors', (req, res) => {
+  res.json({ status: "OK", origin: req.headers.origin, message: "CORS funcionando correctamente 🚀" });
+});
+
+// 🚀 Importar rutas
 const catalogoRoutes = require('./routes/catalogo');
 const loginRoutes = require('./routes/login');
 const registerRoutes = require('./routes/register');
@@ -152,36 +157,53 @@ const categoriasRoutes = require('./routes/categorias');
 const imagenesRoutes = require('./routes/imagenes');
 
 // 🏠 Ruta raíz
-app.get('/', (req, res) => {
-  res.locals.isAuthenticated ? res.redirect('/home') : res.redirect('/catalogo');
-});
+app.get('/', (req, res) =>
+  res.locals.isAuthenticated ? res.redirect('/home') : res.redirect('/catalogo')
+);
 
 // 🌍 Rutas públicas
 app.use('/catalogo', catalogoRoutes);
 app.use('/login', loginRoutes);
 app.use('/register', registerRoutes);
 
-// 🔒 Rutas privadas (requieren IP + JWT)
-app.use('/home', isAuthenticated, ipFilter(allowedIPs), homeRoutes);
-app.use('/productos', isAuthenticated, ipFilter(allowedIPs), productosRoutes);
-app.use('/categorias', isAuthenticated, ipFilter(allowedIPs), categoriasRoutes);
-app.use('/imagenes', isAuthenticated, ipFilter(allowedIPs), imagenesRoutes);
+// 🔒 Rutas privadas (IP + JWT)
+app.use('/home', isAuthenticated, homeRoutes);
+app.use('/productos', isAuthenticated, productosRoutes);
+app.use('/categorias', isAuthenticated, categoriasRoutes);
+app.use('/imagenes', isAuthenticated, imagenesRoutes);
 
-// 📘 Swagger Docs
+// 📘 Swagger
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   explorer: true,
   swaggerOptions: { persistAuthorization: true }
 }));
 
-// ❌ 404 y 500
-app.use((req, res) => res.status(404).render('error', { title: "Error 404", mensaje: 'Página no encontrada', error: null }));
+// ❌ Error 404
+app.use((req, res) => {
+  const isJson = req.headers.accept?.includes('application/json');
+  return isJson
+    ? res.status(404).json({ mensaje: 'Ruta no encontrada' })
+    : res.status(404).render('error', { title: "Error 404", mensaje: 'Página no encontrada', error: null });
+});
+
+// 🔥 Error 500 con detalle visible
 app.use((err, req, res, next) => {
-  console.error('Error no controlado:', err);
-  res.status(500).render('error', { title: "Error del servidor", mensaje: 'Ocurrió un error interno.', error: null });
+  console.error('❌ Error no controlado:', err.stack);
+  const isJson = req.headers.accept?.includes('application/json');
+  return isJson
+    ? res.status(500).json({ mensaje: 'Error interno del servidor', detalle: err.message })
+    : res.status(500).render('error', {
+        title: "Error del servidor",
+        mensaje: 'Ocurrió un error interno.',
+        error: err.message
+      });
 });
 
 // 🚀 Iniciar servidor
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Servidor corriendo en puerto ${PORT}`);
-  console.log(`📘 Swagger Docs: /api-docs`);
+  console.log(`📘 Swagger Docs disponibles en /api-docs`);
+  console.log(`🗄️ Base de datos: ${process.env.DATABASE_URL}`);
 });
+
+module.exports = app;
