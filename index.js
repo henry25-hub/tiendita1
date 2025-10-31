@@ -1,4 +1,3 @@
-// index.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -6,52 +5,48 @@ const requestIp = require('request-ip');
 
 const app = express();
 
-// 🧠 Detectar IP real del cliente
+// Middleware para detectar IP real
 app.use(requestIp.mw());
 
-// 🔒 Lista de IPs bloqueadas
-const blockedIPs = ['179.6.72.125']; // agrega aquí las IPs a bloquear
+// Solo se permite el acceso desde la red del Instituto Continental
+const allowedIPs = [
+  '45.232.149.130', // <-- Cambia esto por la IP pública del instituto
+  '::1' // permite localhost para pruebas
+];
 
-// 🛡️ Middleware de bloqueo
+// Middleware de control de acceso por IP
 app.use((req, res, next) => {
   const clientIP = req.clientIp?.replace('::ffff:', '') || 'desconocida';
-  console.log(`🕵️ Intento de acceso desde: ${clientIP}`);
+  console.log(`🕵️ Acceso desde: ${clientIP}`);
 
-  if (blockedIPs.includes(clientIP)) {
-    return res.status(403).json({ error: 'Acceso denegado: tu IP está bloqueada.' });
+  if (!allowedIPs.includes(clientIP)) {
+    return res.status(403).json({
+      error: '❌ Acceso denegado: Solo se permite desde la red del Instituto Continental.'
+    });
   }
+
   next();
 });
 
-// 🌐 CORS configurado
-const allowedOrigins = [
-  'http://localhost:3000',
-  'https://tu-dominio.com'
-];
-
+// Configurar CORS (solo permite peticiones desde tu frontend)
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log(`❌ CORS bloqueado para: ${origin}`);
-      callback(new Error('Origen no permitido por CORS'));
-    }
-  },
+  origin: [
+    'https://admirable-fudge-d69549.netlify.app', // tu front
+    'http://localhost:3000' // para pruebas locales
+  ],
   credentials: true
 }));
 
-// 📦 Middlewares básicos
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 🚀 Ruta principal
+// Ruta de prueba
 app.get('/', (req, res) => {
-  res.send('✅ Servidor corriendo correctamente y con detección de IP activa.');
+  res.send('✅ Servidor activo. Solo accesible desde la red del Instituto Continental.');
 });
 
-// ⚙️ Puerto
+// Puerto
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
 });
